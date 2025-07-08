@@ -4,13 +4,14 @@ Handles album cover art and track information retrieval from LastFM.
 """
 
 import urllib.request
-import urllib.parse
-import json
 from PIL import Image
 from typing import Optional, Dict, Any
 
+from .api_base import APIBase
+from ..utils.logging_utils import log_error, log_warning
 
-class LastFMAPI:
+
+class LastFMAPI(APIBase):
     """Handles LastFM API interactions for album art and track info."""
     
     def __init__(self, api_key: str):
@@ -20,7 +21,7 @@ class LastFMAPI:
         Args:
             api_key: LastFM API key
         """
-        self.api_key = api_key
+        super().__init__(api_key)
         self.base_url = 'http://ws.audioscrobbler.com/2.0/'
     
     def get_track_info(self, artist: str, track: str) -> Optional[Dict[str, Any]]:
@@ -35,22 +36,24 @@ class LastFMAPI:
             Dictionary containing track information or None if not found
         """
         if not self.is_configured():
-            print("LastFM API key not configured")
+            log_warning("LastFM API key not configured", self.__class__.__name__)
             return None
         
         try:
             url = self._build_track_info_url(artist, track)
-            response = urllib.request.urlopen(url)
-            data = json.load(response)
+            data = self._make_get_request(url)
+            
+            if data is None:
+                return None
             
             if 'track' in data:
                 return data['track']
             else:
-                print(f"Track not found: {artist} - {track}")
+                log_warning(f"Track not found: {artist} - {track}", self.__class__.__name__)
                 return None
                 
         except Exception as e:
-            print(f"Error getting track info from LastFM: {e}")
+            log_error(f"Error getting track info from LastFM", e, self.__class__.__name__)
             return None
     
     def get_album_art_url(self, artist: str, track: str, size: str = 'large') -> Optional[str]:
@@ -88,7 +91,7 @@ class LastFMAPI:
                     return image_url if image_url else None
                     
         except Exception as e:
-            print(f"Error extracting album art URL: {e}")
+            log_error(f"Error extracting album art URL", e, self.__class__.__name__)
         
         return None
     
@@ -114,7 +117,7 @@ class LastFMAPI:
             return image
             
         except Exception as e:
-            print(f"Error downloading album art: {e}")
+            log_error(f"Error downloading album art from {image_url}", e, self.__class__.__name__)
             return None
     
     def get_album_name(self, artist: str, track: str) -> Optional[str]:
@@ -136,7 +139,7 @@ class LastFMAPI:
             if 'album' in track_info and 'title' in track_info['album']:
                 return track_info['album']['title']
         except Exception as e:
-            print(f"Error getting album name: {e}")
+            log_error(f"Error getting album name", e, self.__class__.__name__)
         
         return None
     
@@ -159,8 +162,7 @@ class LastFMAPI:
             'track': track
         }
         
-        query_string = urllib.parse.urlencode(params)
-        return f"{self.base_url}?{query_string}"
+        return self._build_url(self.base_url, params)
     
     def is_configured(self) -> bool:
         """
@@ -169,7 +171,7 @@ class LastFMAPI:
         Returns:
             True if API key is set
         """
-        return bool(self.api_key and self.api_key.strip())
+        return self._is_api_key_valid()
     
     def search_artist(self, artist_name: str, limit: int = 10) -> Optional[Dict[str, Any]]:
         """
@@ -194,14 +196,14 @@ class LastFMAPI:
                 'limit': str(limit)
             }
             
-            query_string = urllib.parse.urlencode(params)
-            url = f"{self.base_url}?{query_string}"
+            url = self._build_url(self.base_url, params)
+            data = self._make_get_request(url)
             
-            response = urllib.request.urlopen(url)
-            data = json.load(response)
+            if data is None:
+                return None
             
             return data.get('results', {}).get('artistmatches', {})
             
         except Exception as e:
-            print(f"Error searching for artist: {e}")
+            log_error(f"Error searching for artist", e, self.__class__.__name__)
             return None

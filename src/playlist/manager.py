@@ -14,6 +14,7 @@ from ..api.acoustid_api import AcoustIDAPI
 from ..api.lastfm_api import LastFMAPI
 from ..api.spotify_api import SpotifyAPI
 from ..utils.image_processor import ImageProcessor
+from ..utils.logging_utils import get_logger, log_error, log_warning, log_info
 
 
 class PlaylistManager:
@@ -29,6 +30,7 @@ class PlaylistManager:
         self.db_manager = db_manager
         self.current_playlist = []  # List of song dictionaries
         self.recommendations = []  # List of recommendation lists
+        self.logger = get_logger(self.__class__.__name__)
         
         # API clients (will be set by main frame)
         self.acoustid_api = None
@@ -58,11 +60,11 @@ class PlaylistManager:
             Song dictionary or None if failed
         """
         if not os.path.isfile(file_path):
-            print(f"File not found: {file_path}")
+            log_warning(f"File not found: {file_path}", self.__class__.__name__)
             return None
         
         if not MetadataExtractor.is_supported_audio_file(file_path):
-            print(f"Unsupported file format: {file_path}")
+            log_warning(f"Unsupported file format: {file_path}", self.__class__.__name__)
             return None
         
         # Extract metadata
@@ -70,7 +72,7 @@ class PlaylistManager:
         
         # Check if song already exists in playlist
         if self._song_exists_in_playlist(metadata['artist'], metadata['title']):
-            print(f"Song already in playlist: {metadata['artist']} - {metadata['title']}")
+            log_info(f"Song already in playlist: {metadata['artist']} - {metadata['title']}", self.__class__.__name__)
             return None
         
         # Create song dictionary
@@ -164,7 +166,7 @@ class PlaylistManager:
             return True
             
         except Exception as e:
-            print(f"Error saving playlist: {e}")
+            log_error(f"Error saving playlist", e, self.__class__.__name__)
             return False
     
     def load_playlist(self, playlist_path: str) -> List[Dict[str, str]]:
@@ -187,7 +189,7 @@ class PlaylistManager:
             return self.load_files(file_paths)
             
         except Exception as e:
-            print(f"Error loading playlist: {e}")
+            log_error(f"Error loading playlist", e, self.__class__.__name__)
             return []
     
     def get_song_by_index(self, index: int) -> Optional[Dict[str, str]]:
@@ -346,7 +348,7 @@ class PlaylistManager:
                     enhanced_song['artist'] = result[0]
                     enhanced_song['title'] = result[1]
             except Exception as e:
-                print(f"Error getting AcoustID metadata: {e}")
+                log_error(f"Error getting AcoustID metadata", e, self.__class__.__name__)
         
         return enhanced_song
     
@@ -379,7 +381,7 @@ class PlaylistManager:
                 self.recommendations.append(recommendations)
                 return recommendations
         except Exception as e:
-            print(f"Error getting album-based recommendations: {e}")
+            log_error(f"Error getting album-based recommendations", e, self.__class__.__name__)
         
         # Fall back to track-based recommendations
         try:
@@ -390,7 +392,7 @@ class PlaylistManager:
                 self.recommendations.append(recommendations)
                 return recommendations
         except Exception as e:
-            print(f"Error getting track-based recommendations: {e}")
+            log_error(f"Error getting track-based recommendations", e, self.__class__.__name__)
         
         return []
     

@@ -8,6 +8,8 @@ from PIL import Image
 from io import BytesIO
 from typing import Optional
 
+from .logging_utils import log_error
+
 
 class ImageProcessor:
     """Handles image processing operations for the music player."""
@@ -83,7 +85,7 @@ class ImageProcessor:
         try:
             return Image.open(BytesIO(image_bytes))
         except Exception as e:
-            print(f"Error converting bytes to PIL image: {e}")
+            log_error(f"Error converting bytes to PIL image", e, "ImageProcessor")
             return None
     
     @staticmethod
@@ -165,7 +167,7 @@ class ImageProcessor:
             static_bitmap.SetBitmap(wx_bitmap)
             
         except Exception as e:
-            print(f"Error displaying image: {e}")
+            log_error(f"Error displaying image", e, "ImageProcessor")
             # Fall back to blank image
             blank_image = wx.Image(max_size[0], max_size[1])
             static_bitmap.SetBitmap(wx.Bitmap(blank_image))

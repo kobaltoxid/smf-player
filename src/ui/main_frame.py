@@ -22,6 +22,8 @@ from ..api.lastfm_api import LastFMAPI
 from ..api.spotify_api import SpotifyAPI
 from ..utils.image_processor import ImageProcessor
 from ..metadata.extractor import MetadataExtractor
+from ..utils.logging_utils import log_info, log_error, log_warning
+from .dialog_helpers import DialogHelpers
 
 
 class MainFrame(wx.Frame):
@@ -215,7 +217,7 @@ class MainFrame(wx.Frame):
             repeat_btn_img = wx.Bitmap("src/resources/repeat-button.png", wx.BITMAP_TYPE_ANY)
             repeat_btn_img = ImageProcessor.scale_bitmap(repeat_btn_img, *BUTTON_SIZE)
         except Exception as e:
-            print(f"Error loading button images: {e}")
+            log_error("Failed to load button images", e, "MainFrame")
             # Create default buttons without images
             play_btn_img = None
             prev_btn_img = None
@@ -314,137 +316,151 @@ class MainFrame(wx.Frame):
     
     def _open_folder(self):
         """Open a folder and load all music files."""
-        with wx.DirDialog(
-            self, "Open Music Dir", 
-            style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST
-        ) as dialog:
-            if dialog.ShowModal() == wx.ID_CANCEL:
-                return
+        folder_path = DialogHelpers.show_directory_dialog(
+            self, "Open Music Dir"
+        )
+        if not folder_path:
+            return
+        
+        log_info(f"Opening folder: {folder_path}", "MainFrame")
+        
+        # Clear current playlist
+        self.playlist_manager.clear_playlist()
+        self._clear_ui()
+        
+        # Load folder
+        try:
+            loaded_songs = self.playlist_manager.load_folder(folder_path)
+            self._refresh_playlist_display()
             
-            folder_path = dialog.GetPath()
-            
-            # Clear current playlist
-            self.playlist_manager.clear_playlist()
-            self._clear_ui()
-            
-            # Load folder
-            try:
-                loaded_songs = self.playlist_manager.load_folder(folder_path)
-                self._refresh_playlist_display()
+            if loaded_songs:
+                self._select_first_song()
+                log_info(f"Loaded {len(loaded_songs)} songs from folder", "MainFrame")
                 
-                if loaded_songs:
-                    self._select_first_song()
-                    
-            except Exception as e:
-                wx.LogError(f"Error loading folder: {e}")
+        except Exception as e:
+            log_error("Failed to load folder", e, "MainFrame")
+            DialogHelpers.show_error_message(self, f"Error loading folder: {e}")
     
     def _open_file(self):
         """Open a single music file."""
-        wildcard = "Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac"
+        file_path = DialogHelpers.show_single_file_dialog(
+            self, "Open Music file",
+            "Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac"
+        )
+        if not file_path:
+            return
         
-        with wx.FileDialog(
-            self, "Open Music file", wildcard=wildcard,
-            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
-        ) as dialog:
-            if dialog.ShowModal() == wx.ID_CANCEL:
-                return
-            
-            file_path = dialog.GetPath()
-            
-            # Clear current playlist
-            self.playlist_manager.clear_playlist()
-            self._clear_ui()
-            
-            # Load file
-            try:
-                song = self.playlist_manager.add_song_from_file(file_path)
-                if song:
-                    self._refresh_playlist_display()
-                    self._select_first_song()
-                    self._load_song_at_index(0)
-                    
-            except Exception as e:
-                wx.LogError(f"Cannot open file '{file_path}': {e}")
+        log_info(f"Opening file: {file_path}", "MainFrame")
+        
+        # Clear current playlist
+        self.playlist_manager.clear_playlist()
+        self._clear_ui()
+        
+        # Load file
+        try:
+            song = self.playlist_manager.add_song_from_file(file_path)
+            if song:
+                self._refresh_playlist_display()
+                self._select_first_song()
+                self._load_song_at_index(0)
+                log_info("File loaded successfully", "MainFrame")
+                
+        except Exception as e:
+            log_error("Failed to open file", e, "MainFrame")
+            DialogHelpers.show_error_message(self, f"Cannot open file '{file_path}': {e}")
     
     def _add_to_playlist(self):
         """Add files to the current playlist."""
-        wildcard = "Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac"
+        file_paths = DialogHelpers.show_multiple_file_dialog(
+            self, "Add music file to playlist",
+            "Music files (*.mp3,*.wav,*.aac,*.ogg,*.flac)|*.mp3;*.wav;*.aac;*.ogg;*.flac"
+        )
+        if not file_paths:
+            return
         
-        with wx.FileDialog(
-            self, "Add music file to playlist", wildcard=wildcard,
-            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE
-        ) as dialog:
-            if dialog.ShowModal() == wx.ID_CANCEL:
-                return
+        log_info(f"Adding {len(file_paths)} files to playlist", "MainFrame")
+        
+        try:
+            loaded_songs = self.playlist_manager.load_files(file_paths)
+            self._refresh_playlist_display()
             
-            file_paths = dialog.GetPaths()
+            # If this is the first song(s) added, select the first one
+            if self.playlist_manager.get_playlist_count() == len(loaded_songs):
+                self._select_first_song()
+                if self.count_add_to_playlist < 1:
+                    self._load_song_at_index(0)
+                    self.count_add_to_playlist += 1
             
-            try:
-                loaded_songs = self.playlist_manager.load_files(file_paths)
-                self._refresh_playlist_display()
-                
-                # If this is the first song(s) added, select the first one
-                if self.playlist_manager.get_playlist_count() == len(loaded_songs):
-                    self._select_first_song()
-                    if self.count_add_to_playlist < 1:
-                        self._load_song_at_index(0)
-                        self.count_add_to_playlist += 1
-                        
-            except Exception as e:
-                wx.LogError(f"Error adding files to playlist: {e}")
+            log_info(f"Added {len(loaded_songs)} songs to playlist", "MainFrame")
+                    
+        except Exception as e:
+            log_error("Failed to add files to playlist", e, "MainFrame")
+            DialogHelpers.show_error_message(self, f"Error adding files to playlist: {e}")
     
     def _save_playlist(self):
         """Save the current playlist."""
-        with wx.FileDialog(
-            self, "Save playlist", wildcard="Playlist file (*.db)|*.db",
-            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT
-        ) as dialog:
-            if dialog.ShowModal() == wx.ID_CANCEL:
-                return
-            
-            if self.playlist_manager.get_playlist_count() >= 1:
-                save_path = dialog.GetPath()
-                success = self.playlist_manager.save_playlist(save_path)
-                if not success:
-                    wx.MessageBox("Error saving playlist", "Error", wx.OK | wx.ICON_ERROR)
+        if self.playlist_manager.get_playlist_count() < 1:
+            DialogHelpers.show_warning_message(self, "No songs in playlist to save.")
+            return
+        
+        save_path = DialogHelpers.show_save_dialog(
+            self, "Save playlist", "Playlist file (*.db)|*.db"
+        )
+        if not save_path:
+            return
+        
+        log_info(f"Saving playlist to: {save_path}", "MainFrame")
+        
+        try:
+            success = self.playlist_manager.save_playlist(save_path)
+            if success:
+                log_info("Playlist saved successfully", "MainFrame")
+                DialogHelpers.show_info_message(self, "Playlist saved successfully!")
+            else:
+                log_error("Failed to save playlist", None, "MainFrame")
+                DialogHelpers.show_error_message(self, "Error saving playlist")
+        except Exception as e:
+            log_error("Failed to save playlist", e, "MainFrame")
+            DialogHelpers.show_error_message(self, f"Error saving playlist: {e}")
     
     def _open_playlist(self):
         """Open a saved playlist."""
-        with wx.FileDialog(
-            self, "Open playlist file", wildcard="Playlist files (*.db)|*.db",
-            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
-        ) as dialog:
-            if dialog.ShowModal() == wx.ID_CANCEL:
-                return
+        playlist_path = DialogHelpers.show_single_file_dialog(
+            self, "Open playlist file", "Playlist files (*.db)|*.db"
+        )
+        if not playlist_path:
+            return
+        
+        log_info(f"Opening playlist: {playlist_path}", "MainFrame")
+        
+        # Clear current playlist
+        self.playlist_manager.clear_playlist()
+        self._clear_ui()
+        self.count_add_to_playlist = 0
+        
+        try:
+            loaded_songs = self.playlist_manager.load_playlist(playlist_path)
+            self._refresh_playlist_display()
             
-            playlist_path = dialog.GetPath()
-            
-            # Clear current playlist
-            self.playlist_manager.clear_playlist()
-            self._clear_ui()
-            self.count_add_to_playlist = 0
-            
-            try:
-                loaded_songs = self.playlist_manager.load_playlist(playlist_path)
-                self._refresh_playlist_display()
+            if loaded_songs:
+                self._select_first_song()
+                self._load_song_at_index(0)
+                self.count_add_to_playlist += 1
+                log_info(f"Loaded {len(loaded_songs)} songs from playlist", "MainFrame")
+            else:
+                log_warning("No songs found in playlist file", "MainFrame")
                 
-                if loaded_songs:
-                    self._select_first_song()
-                    self._load_song_at_index(0)
-                    self.count_add_to_playlist += 1
-                    
-            except Exception as e:
-                wx.LogError(f"Error opening playlist: {e}")
+        except Exception as e:
+            log_error("Failed to open playlist", e, "MainFrame")
+            DialogHelpers.show_error_message(self, f"Error opening playlist: {e}")
     
     def _show_about(self):
         """Show about dialog."""
-        info = wx.MessageDialog(
-            self, 
+        DialogHelpers.show_info_message(
+            self,
             "SMF Player is free for use and covered by the GNU v3.0 license.",
-            "SMF Player ver 0.2.0", 
-            wx.OK | wx.CENTER
+            "SMF Player ver 0.2.0"
         )
-        info.ShowModal()
     
     def _on_playlist_item_selected(self, event):
         """Handle playlist item selection."""
@@ -486,7 +502,7 @@ class MainFrame(wx.Frame):
         
         if not self.media_player.play():
             self.play_button.SetValue(False)
-            wx.MessageBox("A file must be selected.", "ERROR", wx.ICON_ERROR | wx.OK)
+            DialogHelpers.show_error_message(self, "A file must be selected.")
         else:
             length = self.media_player.get_length()
             self.playback_slider.SetRange(0, length)
@@ -630,7 +646,8 @@ class MainFrame(wx.Frame):
                 self.playlist_manager.update_song_path(index, new_path)
                 song['path'] = new_path
             else:
-                wx.MessageBox("The file is missing.", "ERROR", wx.ICON_ERROR | wx.OK)
+                log_warning(f"File missing: {song['path']}", "MainFrame")
+                DialogHelpers.show_error_message(self, "The file is missing.")
                 self.playlist_manager.remove_song(index)
                 self._refresh_playlist_display()
                 self._clear_playback()
@@ -680,7 +697,7 @@ class MainFrame(wx.Frame):
                     )
                     return
             except Exception as e:
-                print(f"Error loading album art from LastFM: {e}")
+                log_error("Failed to load album art from LastFM", e, "MainFrame")
         
         # Fall back to blank image
         self._clear_album_art()
@@ -701,7 +718,7 @@ class MainFrame(wx.Frame):
             )
             self._display_recommendations(recommendations, song['artist'])
         except Exception as e:
-            print(f"Error loading recommendations: {e}")
+            log_error("Failed to load recommendations", e, "MainFrame")
     
     def _display_recommendations(self, recommendations: list, artist_name: str):
         """Display recommendations in the recommendations list."""

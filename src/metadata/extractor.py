@@ -11,6 +11,8 @@ from typing import Dict, Optional
 from mutagen.id3 import ID3
 from mutagen import File as MutaFile
 
+from ..utils.logging_utils import get_logger, log_error
+
 
 class MetadataExtractor:
     """Extracts metadata from audio files."""
@@ -64,7 +66,8 @@ class MetadataExtractor:
                 metadata['year'] = str(audio['TDRC'].text[0])
                 
         except Exception as e:
-            print(f"Could not extract ID3 tags from {file_path}: {e}")
+            logger = get_logger("MetadataExtractor")
+            log_error(f"Could not extract ID3 tags from {file_path}", e, "MetadataExtractor")
             # Keep the backup values
         
         return metadata
@@ -96,7 +99,7 @@ class MetadataExtractor:
                     rate = wav_file.getframerate()
                     return frames / float(rate)
             except Exception as e:
-                print(f"Could not get WAV duration for {file_path}: {e}")
+                log_error(f"Could not get WAV duration for {file_path}", e, "MetadataExtractor")
         
         return 0.0
     
@@ -134,7 +137,7 @@ class MetadataExtractor:
             if "APIC:" in tags:
                 return tags.get("APIC:").data
         except Exception as e:
-            print(f"Could not extract album art from {file_path}: {e}")
+            log_error(f"Could not extract album art from {file_path}", e, "MetadataExtractor")
         
         return None
     

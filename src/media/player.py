@@ -7,6 +7,8 @@ import wx
 import wx.media
 from typing import Optional, Callable
 
+from ..utils.logging_utils import get_logger, log_error, log_warning
+
 
 class MediaPlayer:
     """Wrapper around wx.media.MediaCtrl with additional functionality."""
@@ -24,6 +26,7 @@ class MediaPlayer:
         self.volume = 1.0
         self.is_playing = False
         self.is_paused = False
+        self.logger = get_logger(self.__class__.__name__)
         
         # Callbacks
         self.on_media_finished = None
@@ -36,6 +39,7 @@ class MediaPlayer:
             self.media_ctrl = wx.media.MediaCtrl(self.parent, style=wx.SIMPLE_BORDER)
             self.media_ctrl.SetVolume(self.volume)
         except NotImplementedError:
+            log_error("Media control not supported on this platform", None, self.__class__.__name__)
             raise RuntimeError("Media control not supported on this platform")
     
     def load_file(self, file_path: str) -> bool:
@@ -59,7 +63,7 @@ class MediaPlayer:
                 self.is_paused = False
             return success
         except Exception as e:
-            print(f"Error loading file {file_path}: {e}")
+            log_error(f"Error loading file {file_path}", e, self.__class__.__name__)
             return False
     
     def load_uri(self, uri: str) -> bool:
@@ -83,7 +87,7 @@ class MediaPlayer:
                 self.is_paused = False
             return success
         except Exception as e:
-            print(f"Error loading URI {uri}: {e}")
+            log_error(f"Error loading URI {uri}", e, self.__class__.__name__)
             return False
     
     def play(self) -> bool:
@@ -103,7 +107,7 @@ class MediaPlayer:
                 self.is_paused = False
             return success
         except Exception as e:
-            print(f"Error starting playback: {e}")
+            log_error(f"Error starting playback", e, self.__class__.__name__)
             return False
     
     def pause(self):
@@ -114,7 +118,7 @@ class MediaPlayer:
                 self.is_paused = True
                 self.is_playing = False
             except Exception as e:
-                print(f"Error pausing playback: {e}")
+                log_error(f"Error pausing playback", e, self.__class__.__name__)
     
     def stop(self):
         """Stop playback."""
@@ -124,7 +128,7 @@ class MediaPlayer:
                 self.is_playing = False
                 self.is_paused = False
             except Exception as e:
-                print(f"Error stopping playback: {e}")
+                log_error(f"Error stopping playback", e, self.__class__.__name__)
     
     def seek(self, position: int):
         """
@@ -137,7 +141,7 @@ class MediaPlayer:
             try:
                 self.media_ctrl.Seek(position)
             except Exception as e:
-                print(f"Error seeking to position {position}: {e}")
+                log_error(f"Error seeking to position {position}", e, self.__class__.__name__)
     
     def get_position(self) -> int:
         """
@@ -150,7 +154,7 @@ class MediaPlayer:
             try:
                 return self.media_ctrl.Tell()
             except Exception as e:
-                print(f"Error getting position: {e}")
+                log_error(f"Error getting position", e, self.__class__.__name__)
         return 0
     
     def get_length(self) -> int:
@@ -164,7 +168,7 @@ class MediaPlayer:
             try:
                 return self.media_ctrl.Length()
             except Exception as e:
-                print(f"Error getting length: {e}")
+                log_error(f"Error getting length", e, self.__class__.__name__)
         return 0
     
     def set_volume(self, volume: float):
@@ -179,7 +183,7 @@ class MediaPlayer:
             try:
                 self.media_ctrl.SetVolume(self.volume)
             except Exception as e:
-                print(f"Error setting volume: {e}")
+                log_error(f"Error setting volume", e, self.__class__.__name__)
     
     def get_volume(self) -> float:
         """
@@ -218,7 +222,8 @@ class MediaPlayer:
             position = self.get_position()
             length = self.get_length()
             return position >= length and length > 0
-        except Exception:
+        except Exception as e:
+            log_error(f"Error checking if at end", e, self.__class__.__name__)
             return False
     
     def set_media_finished_callback(self, callback: Callable):

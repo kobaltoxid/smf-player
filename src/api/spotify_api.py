@@ -7,6 +7,8 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from typing import List, Dict, Optional, Tuple
 
+from ..utils.logging_utils import get_logger, log_error, log_warning
+
 
 class SpotifyAPI:
     """Handles Spotify API interactions for recommendations and search."""
@@ -22,12 +24,13 @@ class SpotifyAPI:
         self.client_id = client_id
         self.client_secret = client_secret
         self.spotify = None
+        self.logger = get_logger(self.__class__.__name__)
         self._initialize_client()
     
     def _initialize_client(self):
         """Initialize the Spotify client with credentials."""
         if not self.is_configured():
-            print("Spotify API credentials not configured")
+            log_warning("Spotify API credentials not configured", self.__class__.__name__)
             return
         
         try:
@@ -39,7 +42,7 @@ class SpotifyAPI:
                 client_credentials_manager=client_credentials_manager
             )
         except Exception as e:
-            print(f"Error initializing Spotify client: {e}")
+            log_error(f"Error initializing Spotify client", e, self.__class__.__name__)
             self.spotify = None
     
     def search_artist_by_album(self, artist_name: str, album_name: str) -> Optional[str]:
@@ -77,7 +80,7 @@ class SpotifyAPI:
                     break
                     
         except Exception as e:
-            print(f"Error searching for artist by album: {e}")
+            log_error(f"Error searching for artist by album", e, self.__class__.__name__)
         
         return None
     
@@ -115,7 +118,7 @@ class SpotifyAPI:
                     break
                     
         except Exception as e:
-            print(f"Error searching for artist by track: {e}")
+            log_error(f"Error searching for artist by track", e, self.__class__.__name__)
         
         return None
     
@@ -152,7 +155,7 @@ class SpotifyAPI:
             return results
             
         except Exception as e:
-            print(f"Error getting recommendations: {e}")
+            log_error(f"Error getting recommendations", e, self.__class__.__name__)
             return []
     
     def get_recommendations_by_album_artist(self, track_name: str, artist_name: str) -> List[Dict[str, str]]:
@@ -229,7 +232,7 @@ class SpotifyAPI:
                 return results['tracks']['items'][0]
                 
         except Exception as e:
-            print(f"Error searching for track: {e}")
+            log_error(f"Error searching for track", e, self.__class__.__name__)
         
         return None
     

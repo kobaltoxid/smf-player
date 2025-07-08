@@ -7,6 +7,8 @@ import sqlite3
 import os
 from typing import List, Tuple, Optional
 
+from ..utils.logging_utils import get_logger, log_error
+
 
 class DatabaseManager:
     """Manages SQLite database operations for the music player."""
@@ -15,6 +17,7 @@ class DatabaseManager:
         self.db_path = db_path
         self.conn = None
         self.cursor = None
+        self.logger = get_logger(self.__class__.__name__)
         self._connect()
         self._create_tables()
     
@@ -24,7 +27,7 @@ class DatabaseManager:
             self.conn = sqlite3.connect(self.db_path)
             self.cursor = self.conn.cursor()
         except sqlite3.Error as e:
-            print(f"Database connection error: {e}")
+            log_error(f"Database connection error", e, self.__class__.__name__)
             raise
     
     def _create_tables(self):
@@ -68,7 +71,7 @@ class DatabaseManager:
             self.conn.commit()
             return True
         except sqlite3.Error as e:
-            print(f"Error inserting song: {e}")
+            log_error(f"Error inserting song", e, self.__class__.__name__)
             return False
     
     def update_times_played(self, path: str) -> int:
@@ -87,7 +90,7 @@ class DatabaseManager:
                 return new_count
             return 0
         except sqlite3.Error as e:
-            print(f"Error updating times played: {e}")
+            log_error(f"Error updating times played", e, self.__class__.__name__)
             return 0
     
     def get_song_by_artist_title(self, artist: str, title: str) -> Optional[Tuple]:
@@ -99,7 +102,7 @@ class DatabaseManager:
             )
             return self.cursor.fetchone()
         except sqlite3.Error as e:
-            print(f"Error getting song: {e}")
+            log_error(f"Error getting song", e, self.__class__.__name__)
             return None
     
     def get_times_played(self, path: str) -> int:
@@ -109,7 +112,7 @@ class DatabaseManager:
             result = self.cursor.fetchone()
             return result[0] if result else 0
         except sqlite3.Error as e:
-            print(f"Error getting times played: {e}")
+            log_error(f"Error getting times played", e, self.__class__.__name__)
             return 0
     
     def delete_song_by_path(self, path: str):
@@ -118,7 +121,7 @@ class DatabaseManager:
             self.cursor.execute('DELETE FROM playlist WHERE path = ?', (path,))
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"Error deleting song: {e}")
+            log_error(f"Error deleting song", e, self.__class__.__name__)
     
     def delete_song_by_artist_title(self, artist: str, title: str):
         """Delete a song from the playlist by artist and title."""
@@ -129,7 +132,7 @@ class DatabaseManager:
             )
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"Error deleting song: {e}")
+            log_error(f"Error deleting song", e, self.__class__.__name__)
     
     def update_song_path(self, old_path: str, new_path: str):
         """Update the path of a song in the database."""
@@ -140,7 +143,7 @@ class DatabaseManager:
             )
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"Error updating song path: {e}")
+            log_error(f"Error updating song path", e, self.__class__.__name__)
     
     def insert_or_update_rating(self, title: str, artist: str, rating: int = None):
         """Insert or update a song rating."""
@@ -158,7 +161,7 @@ class DatabaseManager:
                 ''', (title, artist, title, artist))
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"Error inserting/updating rating: {e}")
+            log_error(f"Error inserting/updating rating", e, self.__class__.__name__)
     
     def get_rating(self, title: str, artist: str) -> Optional[int]:
         """Get the rating for a song."""
@@ -170,7 +173,7 @@ class DatabaseManager:
             result = self.cursor.fetchone()
             return result[0] if result and result[0] is not None else 0
         except sqlite3.Error as e:
-            print(f"Error getting rating: {e}")
+            log_error(f"Error getting rating", e, self.__class__.__name__)
             return 0
     
     def update_rating(self, title: str, artist: str, rating: int):
@@ -182,7 +185,7 @@ class DatabaseManager:
             )
             self.conn.commit()
         except sqlite3.Error as e:
-            print(f"Error updating rating: {e}")
+            log_error(f"Error updating rating", e, self.__class__.__name__)
     
     def get_all_playlist_paths(self) -> List[str]:
         """Get all file paths from the current playlist."""
@@ -190,7 +193,7 @@ class DatabaseManager:
             self.cursor.execute('SELECT path FROM playlist')
             return [row[0] for row in self.cursor.fetchall()]
         except sqlite3.Error as e:
-            print(f"Error getting playlist paths: {e}")
+            log_error(f"Error getting playlist paths", e, self.__class__.__name__)
             return []
     
     def close(self):

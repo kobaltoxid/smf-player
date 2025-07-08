@@ -3,15 +3,15 @@ AcoustID API integration for SMF Player.
 Handles audio fingerprinting and metadata lookup using AcoustID service.
 """
 
-import urllib.request
-import urllib.parse
-import json
 import acoustid
 from acoustid import fingerprint_file
 from typing import Optional, Tuple
 
+from .api_base import APIBase
+from ..utils.logging_utils import log_error, log_warning
 
-class AcoustIDAPI:
+
+class AcoustIDAPI(APIBase):
     """Handles AcoustID API interactions for audio fingerprinting."""
     
     def __init__(self, api_key: str):
@@ -21,7 +21,7 @@ class AcoustIDAPI:
         Args:
             api_key: AcoustID API key
         """
-        self.api_key = api_key
+        super().__init__(api_key)
     
     def get_metadata_from_file(self, file_path: str) -> Optional[Tuple[str, str]]:
         """
@@ -33,15 +33,15 @@ class AcoustIDAPI:
         Returns:
             Tuple of (artist, title) or None if not found
         """
-        if not self.api_key:
-            print("AcoustID API key not configured")
+        if not self.is_configured():
+            log_warning("AcoustID API key not configured", self.__class__.__name__)
             return None
         
         try:
             # Generate fingerprint
             fingerprint_data = fingerprint_file(file_path, force_fpcalc=True)
             if not fingerprint_data or len(fingerprint_data) < 2:
-                print("Could not generate fingerprint")
+                log_warning(f"Could not generate fingerprint for {file_path}", self.__class__.__name__)
                 return None
             
             duration = fingerprint_data[0]
@@ -55,14 +55,15 @@ class AcoustIDAPI:
             url = self._build_lookup_url(duration, fingerprint)
             
             # Make API request
-            response = urllib.request.urlopen(url)
-            data = json.loads(response.read())
+            data = self._make_get_request(url)
+            if data is None:
+                return None
             
             # Parse response
             return self._parse_lookup_response(data)
             
         except Exception as e:
-            print(f"Error getting metadata from AcoustID: {e}")
+            log_error(f"Error getting metadata from AcoustID", e, self.__class__.__name__)
             return None
     
     def _build_lookup_url(self, duration: float, fingerprint: str) -> str:
@@ -84,8 +85,7 @@ class AcoustIDAPI:
             'fingerprint': fingerprint
         }
         
-        query_string = urllib.parse.urlencode(params)
-        return f"{base_url}?{query_string}"
+        return self._build_url(base_url, params)
     
     def _parse_lookup_response(self, data: dict) -> Optional[Tuple[str, str]]:
         """
@@ -119,7 +119,7 @@ class AcoustIDAPI:
                         return (artist, title)
             
         except Exception as e:
-            print(f"Error parsing AcoustID response: {e}")
+            log_error(f"Error parsing AcoustID response", e, self.__class__.__name__)
         
         return None
     
@@ -130,4 +130,4 @@ class AcoustIDAPI:
         Returns:
             True if API key is set
         """
-        return bool(self.api_key and self.api_key.strip())
+        return self._is_api_key_valid()
