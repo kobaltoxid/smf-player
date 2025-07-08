@@ -53,8 +53,4 @@ If you'd like to have songs that are not ID3 tagged to be indexed then you'll al
 
 And if you'd like to have a faster search for song recommendations, you'll need a LastFM API key (altough it's not necessary): [LastFM](https://secure.last.fm/login?next=/api/account/create)
 
-And finally. You'll need to enter your keys in the app.
-
-You'll need to input them on the top of the smf-player.py file here:
-
-![Place for API keys](https://github.com/roterabe/smf-player/blob/master/keys.png)
+And finally. You'll need to enter your keys in [config.py](src/config.py).
